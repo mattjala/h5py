@@ -31,6 +31,7 @@ from h5py._hl.base import is_empty_dataspace, product
 from h5py import h5f, h5t
 from h5py.h5py_warnings import H5pyDeprecationWarning
 from h5py import version
+from h5py._hl.dataset import MultiManager
 import h5py
 import h5py._hl.selections as sel
 
@@ -1991,3 +1992,120 @@ class TestVirtualPrefix(BaseDataset):
         self.assertEqual(virtual_prefix, virtual_prefix_readback)
         self.assertIsInstance(dset, Dataset)
         self.assertEqual(dset.shape, (10, 3))
+
+@ut.skipIf(h5py.version.hdf5_version_tuple < (1, 14, 0),
+           "MultiManager requires HDF5 >= 1.14.0")
+class TestMultiManager(BaseDataset):
+    def test_multi_read_scalar_dataspaces(self):
+        shape = ()
+        count = 3
+        dt = np.int32
+
+        # Create datasets
+        data_in = np.array([1])
+        datasets = []
+
+        for i in range(count):
+            dset = self.f.create_dataset("data" + str(i), shape,
+                                         dtype=dt, data=(data_in + i))
+            datasets.append(dset)
+
+        mm = MultiManager(datasets)
+
+        # Select via empty tuple
+        data_out = mm[()]
+
+        self.assertEqual(len(data_out), count)
+
+        for i in range(count):
+            np.testing.assert_array_equal(data_out[i], data_in + i)
+
+        # Select via Ellipsis
+        data_out = mm[...]
+
+        self.assertEqual(len(data_out), count)
+
+        for i in range(count):
+            np.testing.assert_array_equal(data_out[i], data_in + i)
+
+    def test_multi_read_non_scalar_dataspaces(self):
+        shape = (10, 10, 10)
+        count = 3
+        dt = np.int32
+
+        # Create datasets
+        data_in = np.reshape(np.arange(np.prod(shape)), shape)
+        datasets = []
+
+        for i in range(count):
+            dset = self.f.create_dataset("data" + str(i), shape,
+                                         dtype=dt, data=(data_in + i))
+            datasets.append(dset)
+
+        mm = MultiManager(datasets)
+        data_out = mm[...]
+
+        self.assertEqual(len(data_out), count)
+
+        for i in range(count):
+            np.testing.assert_array_equal(data_out[i], data_in + i)
+
+        # Partial Read
+        data_out = mm[:, :, 0]
+
+        self.assertEqual(len(data_out), count)
+
+        for i in range(count):
+            np.testing.assert_array_equal(data_out[i], (data_in + i)[:, :, 0])
+
+    def test_multi_read_mixed_dataspaces(self):
+        scalar_shape = ()
+        shape = (10, 10, 10)
+        count = 3
+        dt = np.int32
+
+        # Create datasets
+        data_scalar_in = np.array([1])
+        data_in = np.reshape(np.arange(np.prod(shape)), shape)
+        datasets = []
+
+        for i in range(count):
+            if i == 0:
+                dset = self.f.create_dataset("data" + str(0), scalar_shape,
+                                             dtype=dt, data=data_scalar_in)
+            else:
+                dset = self.f.create_dataset("data" + str(i), shape,
+                                             dtype=dt, data=(data_in + i))
+            datasets.append(dset)
+
+        mm = MultiManager(datasets)
+
+        # Select via empty tuple
+        data_out = mm[()]
+
+        self.assertEqual(len(data_out), count)
+
+        for i in range(count):
+            if i == 0:
+                np.testing.assert_array_equal(data_out[i], data_scalar_in)
+            else:
+                np.testing.assert_array_equal(data_out[i], data_in + i)
+
+        # Select via Ellipsis
+        data_out = mm[...]
+
+        self.assertEqual(len(data_out), count)
+
+        for i in range(count):
+            if i == 0:
+                np.testing.assert_array_equal(data_out[i], data_scalar_in)
+            else:
+                np.testing.assert_array_equal(data_out[i], data_in + i)
+
+    """
+    TBD 
+    def test_multi_read_region_references(self):
+        pass
+    def test_multi_read_field_subsets(self):
+        pass
+    """

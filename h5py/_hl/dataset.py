@@ -1140,3 +1140,92 @@ class Dataset(HLObject):
         Return ``False`` otherwise.
         """
         return h5ds.is_scale(self._id)
+
+
+class MultiManager():
+
+    """
+    High-level object to support slicing operations
+    that map to H5Dread_multi/H5Dwrite_multi
+    """
+    @with_phil
+    def __init__(self, datasets=[]):
+        self.datasets = datasets
+
+    @with_phil
+    def __getitem__(self, args, new_dtypes=None):
+        """
+        TBD
+        """
+        count = len(self.datasets)
+        args = args if isinstance(args, tuple) else (args,)
+
+        out = [numpy.empty(1)] * count
+
+        for i in range(count):
+            if self.datasets[i]._is_empty:
+                raise ValueError("Multi read requires non-empty datasets")
+
+        for i in range(count):
+            if self.datasets[i].size == 0:
+                raise ValueError("Multi read requires non-zero-sized datasets")
+
+        # Sort field names from the rest of the args.
+        names = tuple(x for x in args if isinstance(x, str))
+
+        if names:
+            raise ValueError("Field subsetting not supported with multi read")
+
+        # Standardize new_dtype to list
+        if new_dtypes is None:
+            new_dtypes = []
+            for i in range(count):
+                new_dtypes.append(self.datasets[i].dtype)
+        elif isinstance(new_dtypes, numpy.dtype):
+            _new_dtypes = []
+            for i in range(count):
+                _new_dtypes.append(new_dtypes)
+            new_dtypes = _new_dtypes
+
+        if len(args) == 1 and isinstance(args[0], h5r.RegionReference):
+            raise ValueError("Region references not supported with multi read")
+
+        fspaces = [None] * count
+        mspaces = [None] * count
+        selections = [None] * count
+        mtypes = [h5t.py_create(new_dtype) for new_dtype in new_dtypes]
+
+        for i in range(count):
+            if self.datasets[i].shape == ():
+                # Initialize output buffer for scalar dataspace
+                fspaces[i] = self.datasets[i].id.get_space()
+                selections[i] = sel2.select_read(fspaces[i], args)
+                mspaces[i] = selections[i].mspace
+
+                if selections[i].mshape is None:
+                    out[i] = numpy.zeros((), dtype=new_dtypes[i])
+                else:
+                    out[i] = numpy.zeros(selections[i].mshape, dtype=new_dtypes[i])
+            else:
+                # Initialize output buffer for non-scalar dataspace
+                selections[i] = sel.select(self.datasets[i].shape, args, self.datasets[i])
+                fspaces[i] = selections[i].id
+                mspaces[i] = h5s.create_simple(selections[i].mshape)
+
+                out[i] = numpy.zeros(selections[i].array_shape, dtype=new_dtypes[i], order='C')
+
+        # Perform the actual read_multi
+        fspace_ids = [f.id for f in fspaces]
+        mspace_ids = [m.id for m in mspaces]
+        type_ids = [t.id for t in mtypes]
+        dset_ids = [d.id.id for d in self.datasets]
+
+        h5d.rw_multi(dset_ids, mspace_ids, fspace_ids, type_ids, out, 1,
+                     dxpl=None)
+
+        # Patch up the output for NumPy
+        for i in range(count):
+            if (selections[i].mshape is None) or (out[i].shape == ()):
+                out[i] = out[i][()]  # 0 dim array -> numpy scalar
+
+        return out
