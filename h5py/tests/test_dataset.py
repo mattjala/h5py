@@ -2078,7 +2078,8 @@ class TestMultiManager(BaseDataset):
                                              dtype=dt, data=(data_in + i))
             datasets.append(dset)
 
-        mm = MultiManager(datasets)
+        # Set up MultiManager for read
+        mm = MultiManager(datasets=datasets)
 
         # Select via empty tuple
         data_out = mm[()]
@@ -2101,6 +2102,58 @@ class TestMultiManager(BaseDataset):
                 np.testing.assert_array_equal(data_out[i], data_scalar_in)
             else:
                 np.testing.assert_array_equal(data_out[i], data_in + i)
+
+    def test_multi_read_mixed_types(self):
+        shape = (10, 10, 10)
+        count = 4
+        dts = [np.int32, np.int64, np.float64, np.dtype("S10")]
+
+        # Create datasets
+        data_in = np.reshape(np.arange(np.prod(shape)), shape)
+        data_in_fixed_str = np.full(shape, "abcdefghij", dtype=dts[3])
+        datasets = []
+
+        for i in range(count):
+            if i < 3:
+                dset = self.f.create_dataset("data" + str(i), shape,
+                                             dtype=dts[i], data=(data_in + i))
+            else:
+                dset = self.f.create_dataset("data" + str(i), shape,
+                                                        dtype=dts[i], data=data_in_fixed_str)
+
+            datasets.append(dset)
+
+        # Set up MultiManager for read
+        mm = MultiManager(datasets=datasets, types=dts)
+
+        # Perform read
+        data_out = mm[...]
+
+        self.assertEqual(len(data_out), count)
+
+        for i in range(count):
+            if i < 3:
+                np.testing.assert_array_equal(data_out[i], np.array(data_in + i, dtype=dts[i]))
+            else:
+                np.testing.assert_array_equal(data_out[i], data_in_fixed_str)
+
+            self.assertEqual(data_out[i].dtype, dts[i])
+
+    def test_multi_read_vlen_str(self):
+        shape = (10, 10, 10)
+        dt = h5py.string_dtype(encoding='utf-8')
+        data_in = np.full(shape, "abcdefghij", dt)
+        dset = self.f.create_dataset("dset", shape=shape, data=data_in, dtype=dt)
+
+        mm = MultiManager([dset])
+        out = mm[...][0]
+
+        self.assertEqual(out.dtype, dt)
+
+        out = np.reshape(out, newshape=np.prod(shape))
+        out = np.reshape(np.array([s.decode() for s in out], dtype=dt),
+                         newshape=shape)
+        np.testing.assert_array_equal(out, data_in)
 
     """
     TBD 

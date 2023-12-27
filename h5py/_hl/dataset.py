@@ -1149,16 +1149,28 @@ class MultiManager():
     that map to H5Dread_multi/H5Dwrite_multi
     """
     @with_phil
-    def __init__(self, datasets=[]):
+    def __init__(self, datasets=None, types=None):
+        if (datasets is None) or (len(datasets) == 0):
+            raise ValueError("MultiManager requires non-empty list of datasets")
+
         self.datasets = datasets
+        self.types = types
 
     @with_phil
     def __getitem__(self, args, new_dtypes=None):
-        """
-        TBD
+        """ Read the same slice from each of the datasets
+        managed by this MultiManager.
+
+        Takes slices. Obeys basic NumPy rules, including broadcasting.
+
+        Will throw an error if any of the managed datasets are
+        unreadable due to being empty or zero-sized.
         """
         count = len(self.datasets)
         args = args if isinstance(args, tuple) else (args,)
+
+        if (new_dtypes is None) and (self.types is not None):
+            new_dtypes = self.types
 
         out = [numpy.empty(1)] * count
 
