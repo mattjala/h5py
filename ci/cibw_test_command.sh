@@ -22,7 +22,4 @@ export H5PY_TEST_CHECK_FILTERS=1
 echo "ENVLIST=$ENVLIST"
 cd $PROJECT_PATH
 tox --installpkg $WHEEL_PATH -e $ENVLIST
-if [[ "$GITHUB_ACTION" != "" ]]; then
-    echo "Uploading coverage using python=$(which python)"
-    python ./ci/upload_coverage.py --codecov-token 813fb6da-087d-4b36-a185-5a530cab3455
-fi
+# No coverage upload: this token is for h5py's own Codecov project.

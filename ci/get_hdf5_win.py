@@ -25,6 +25,7 @@ import requests
 import platform
 
 HDF5_URL = "https://github.com/HDFGroup/hdf5/archive/refs/tags/{zip_file}"
+HDF5_REF_URL = "https://github.com/HDFGroup/hdf5/archive/{ref}.zip"
 ZLIB_ROOT = environ.get('ZLIB_ROOT')
 arch = platform.machine().lower()
 
@@ -82,6 +83,10 @@ def download_hdf5(version, outfile):
              HDF5_URL.format(zip_file=zip_fmt2),
              HDF5_URL.format(zip_file=zip_fmt3),
              ]
+    if environ.get("HDF5_REF"):
+        # A commit or tag to build instead of the HDF5_VERSION release. The
+        # archive unpacks to hdf5-<ref>, as get_cmake_config_path expects.
+        files = [HDF5_REF_URL.format(ref=environ["HDF5_REF"])]
 
     for file in files:
         print(f"Downloading hdf5 from {file} ...", file=stderr)

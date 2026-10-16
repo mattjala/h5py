@@ -8,7 +8,7 @@ if [[ "$1" == "" ]] ; then
 fi
 PROJECT_PATH="$1"
 ARCH=$(uname -m)
-export HDF5_VERSION="2.2.0"
+export HDF5_VERSION="2.3.0"  # what HDF5_REF reports
 export HDF5_DIR="$PROJECT_PATH/cache/hdf5/$HDF5_VERSION-$ARCH"
 source $PROJECT_PATH/ci/get_hdf5_if_needed.sh
 

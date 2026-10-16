@@ -146,10 +146,8 @@ test-skip = [
 
 build-verbosity = 1
 build-frontend = { name = "pip", args = ["--only-binary", "numpy"] }
-manylinux-x86_64-image = "ghcr.io/h5py/manylinux_2_28_x86_64-hdf5"
-manylinux-aarch64-image = "ghcr.io/h5py/manylinux_2_28_aarch64-hdf5"
-musllinux-x86_64-image = "ghcr.io/h5py/musllinux_1_2_x86_64-hdf5"
-musllinux-aarch64-image = "ghcr.io/h5py/musllinux_1_2_aarch64-hdf5"
+# The default manylinux/musllinux images, with HDF5_REF built in before-all
+# the way the ghcr.io/h5py/*-hdf5 images build a release.
 test-groups = ["wheels"]
 test-command = "bash {project}/ci/cibw_test_command.sh {project} {wheel}"
 
@@ -159,10 +157,17 @@ environment-pass = [
     "H5PY_LIMITED_API",
     "PIP_EXTRA_INDEX_URL",
     "PIP_PRE",
+    "HDF5_REF",
+    "H5PY_INTERNAL_THREADS",
 ]
+
+[tool.cibuildwheel.linux]
+before-all = "bash {project}/ci/preview/install_libaec.sh && bash {project}/ci/preview/install_hdf5.sh"
 
 [tool.cibuildwheel.linux.environment]
 CFLAGS = "-g1"
+HDF5_VERSION = "2.3.0"  # what HDF5_REF reports
+HDF5_DIR = "/usr/local"
 
 [tool.cibuildwheel.macos]
 # https://cibuildwheel.pypa.io/en/stable/faq/#macos-passing-dyld_library_path-to-delocate

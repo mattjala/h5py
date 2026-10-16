@@ -86,6 +86,10 @@ else
             "${url_base}${ASSET_FMT1}.tar.gz"
             "${url_base}${ASSET_FMT2}.tar.gz"
         )
+        if [[ -n "${HDF5_REF}" ]]; then
+            # A commit or tag to build instead of the HDF5_VERSION release
+            urls=("https://github.com/HDFGroup/hdf5/archive/${HDF5_REF}.tar.gz")
+        fi
         set +e
         for url in "${urls[@]}"; do
             echo "downloading from $url"
